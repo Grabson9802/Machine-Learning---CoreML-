@@ -12,7 +12,6 @@ import Vision
 class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     
     private let imageView = UIImageView()
-    
     private let imagePicker = UIImagePickerController()
 
     override func viewDidLoad() {
@@ -26,7 +25,7 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
         setupImageView()
         
         imagePicker.delegate = self
-        imagePicker.sourceType = .photoLibrary
+        imagePicker.sourceType = .camera
         imagePicker.allowsEditing = false
     }
     
@@ -44,10 +43,43 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
         imageView.backgroundColor = .systemGreen
     }
     
+    private func detect(image: CIImage) {
+        guard let model = try? VNCoreMLModel(for: Inceptionv3().model) else {
+            fatalError("Load CoreML Model Failed.")
+        }
+        
+        let request = VNCoreMLRequest(model: model) { request, error in
+            guard let results = request.results as? [VNClassificationObservation] else {
+                fatalError("Model failed to process")
+            }
+            
+            if let firstResult = results.first {
+                if firstResult.identifier.contains("hotdog") {
+                    self.navigationItem.title = "hotdog"
+                } else {
+                    self.navigationItem.title = "not hotdog"
+                }
+            }
+        }
+        let handler = VNImageRequestHandler(ciImage: image)
+        
+        do {
+            try handler.perform([request])
+        } catch {
+            print(error)
+        }
+    }
+    
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         
         if let userPickedImage = info[UIImagePickerController.InfoKey.originalImage] as? UIImage {
             imageView.image =  userPickedImage
+            
+            guard let ciimage = CIImage(image: userPickedImage) else {
+                fatalError("Could not convert to CIImage")
+            }
+            
+            detect(image: ciimage)
         }
         imagePicker.dismiss(animated: true, completion: nil)
     }
